@@ -9,19 +9,11 @@ make prod
 ```
 
 
+##### Usage:
 
-Images:
+ `./objview [options] <file.obj>`
 
-
-![1771485927473](image/README/1771485927473.png)
-
-![1771486559845](image/README/1771486559845.png)
-
-![1771486912713](image/README/1771486912713.png)
-
-Usage: `./objview [options] <file.obj>`
-
-Options:
+##### Options:
 
 -f, --fps N        Target FPS (default 60)
 
@@ -70,3 +62,12 @@ O  rotate out
 U  double scaling
 
 I  half scaling
+
+
+#### Images:
+
+![1771485927473](image/README/1771485927473.png)
+
+![1771486559845](image/README/1771486559845.png)
+
+![1771486912713](image/README/1771486912713.png)
