@@ -23,6 +23,8 @@ make prod
 
 -c  --color R,G,B  Change display color
 
+-b  --bcolor R,G,B Change background color
+
 -h, --help         Show this help
 
 -v, --version      Show version
@@ -47,6 +49,10 @@ u  zoom in
 
 i  zoom out
 
+y  increase brightness
+
+o  decrease brightness
+
 J  rotate left
 
 L  rotate right
@@ -64,10 +70,17 @@ U  double scaling
 I  half scaling
 
 
+## TODO:
+- Fix textures
+- Add additional file support
+- Clean up & make more user-friendly
+
 #### Images:
 
-![1771485927473](image/README/1771485927473.png)
+![tux](image/README/tux.png)
 
-![1771486559845](image/README/1771486559845.png)
+![car](image/README/car.png)
 
-![1771486912713](image/README/1771486912713.png)
+![dual](image/README/dual.png)
+
+![droid](image/README/droid.png)

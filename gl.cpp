@@ -1,4 +1,5 @@
 #include "gl.hpp"
+#include "Model.hpp"
 #include <algorithm>
 #include <cmath>
 #include <vector>
@@ -86,20 +87,22 @@ void reset_z_buffer(size_t size) {
 
 static Vec3 light_dir = Vec3{0, 1, 0.75}.n();
 static Vec3 camera_pos = {0, 0, 0};
+static float brightness = 1.0f;
 
-void rasterize(Vec4 v[3], Vec3 vn[3], std::vector<Color> &frame, int width,
-               float hw, int height, float hh, const Color &basecolor) {
+void set_brightness(float intensity) { brightness = intensity; }
+
+void rasterize(const Model &model, int face_idx, Vec4 v[3], Vec3 vn[3],
+               Vec2 uv[3], std::vector<Color> &frame, int width, float hw,
+               int height, float hh, const Color *override_color) {
+  const Material &mat = model.mat(face_idx);
   for (const int &i : {0, 1, 2})
     vn[i] = (M * Vec4{vn[i].x, vn[i].y, vn[i].z, 0}).xyz().n();
-
   float inv_w[3] = {1.0f / v[0].w, 1.0f / v[1].w, 1.0f / v[2].w};
-
   Vec3 a = v[0].xyz() * inv_w[0];
   Vec3 b = v[1].xyz() * inv_w[1];
   Vec3 c = v[2].xyz() * inv_w[2];
-
   Vec3 n_over_w[3] = {vn[0] * inv_w[0], vn[1] * inv_w[1], vn[2] * inv_w[2]};
-
+  Vec2 uv_over_w[3] = {uv[0] * inv_w[0], uv[1] * inv_w[1], uv[2] * inv_w[2]};
   Vec2 a_s = {hw + a.x * hw, hh + a.y * hh};
   Vec2 b_s = {hw + b.x * hw, hh + b.y * hh};
   Vec2 c_s = {hw + c.x * hw, hh + c.y * hh};
@@ -139,9 +142,14 @@ void rasterize(Vec4 v[3], Vec3 vn[3], std::vector<Color> &frame, int width,
            (1. / inv_w_interp))
               .n();
 
-      float ambient = 0.20f;
+      Vec2 uv_interp =
+          (uv_over_w[0] * alpha + uv_over_w[1] * beta + uv_over_w[2] * gamma) *
+          (1.f / inv_w_interp);
 
-      float diff = std::max(0.0f, n * light_dir);
+      Vec3 ka = mat.ka, kd = mat.kd, ks = mat.ks;
+      float shininess = mat.Ns;
+      Vec3 ambient = mat.ka;
+      Vec3 diff = kd * std::max(0.0f, n * light_dir);
 
       Vec3 world_pos =
           ((v[0].xyz() * alpha * inv_w[0] + v[1].xyz() * beta * inv_w[1] +
@@ -150,17 +158,40 @@ void rasterize(Vec4 v[3], Vec3 vn[3], std::vector<Color> &frame, int width,
 
       Vec3 view_dir = (camera_pos - world_pos).n();
 
-      Vec3 reflect_dir = ((n * (n * light_dir) * 2.f) - light_dir).n();
+      Vec3 reflect_dir = ((n * (2.f * (n * light_dir))) - light_dir).n();
+      float spec_factor =
+          powf(std::max(view_dir * reflect_dir, 0.0f), shininess);
+      Vec3 spec = ks * spec_factor;
 
-      float spec = powf(std::max((view_dir * reflect_dir), 0.0f), 64.0f);
+      Vec3 color_rgb = ambient + diff + spec;
 
-      float intensity = ambient + 0.9f * diff + 0.6f * spec;
+      color_rgb.x = std::min(color_rgb.x, 1.0f);
+      color_rgb.y = std::min(color_rgb.y, 1.0f);
+      color_rgb.z = std::min(color_rgb.z, 1.0f);
 
-      intensity = std::min(intensity, 1.0f);
+      Color base;
+      if (override_color) {
+        base = *override_color;
+      } else if (mat.has_texture) {
+        int tx = std::clamp(int(uv_interp.x * mat.texture.width), 0,
+                            mat.texture.width - 1);
+        int ty = std::clamp(int((1.0f - uv_interp.y) * mat.texture.height), 0,
+                            mat.texture.height - 1);
+        base = mat.texture.pixels[ty * mat.texture.width + tx];
+      } else {
+        base = {
+            (unsigned char)(mat.kd.x * 255),
+            (unsigned char)(mat.kd.y * 255),
+            (unsigned char)(mat.kd.z * 255),
+        };
+      }
 
-      Color shaded{(unsigned char)(basecolor.r * intensity),
-                   (unsigned char)(basecolor.g * intensity),
-                   (unsigned char)(basecolor.b * intensity)};
+      Color shaded = {(unsigned char)std::clamp(
+                          (base.r * color_rgb.x * brightness), 0.f, 255.f),
+                      (unsigned char)std::clamp(
+                          (base.g * color_rgb.y * brightness), 0.f, 255.f),
+                      (unsigned char)std::clamp(
+                          (base.b * color_rgb.z * brightness), 0.f, 255.f)};
 
       frame[y * width + x] = shaded;
     }

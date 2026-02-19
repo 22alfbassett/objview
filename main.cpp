@@ -2,7 +2,6 @@
 #include "gl.hpp"
 
 #include <algorithm>
-#include <cmath>
 #include <cstddef>
 #include <cstdio>
 #include <cstdlib>
@@ -26,8 +25,10 @@ static unsigned render_height = 0;
 
 static bool g_use_fixed_color = false;
 static Color g_fixed_color = (Color){0, 0, 0};
+static Color g_background_color = (Color){0, 0, 0};
 
 volatile sig_atomic_t resized = 0;
+static float brightness = 1.0f;
 
 void cleanup() {
   tcsetattr(STDIN_FILENO, TCSAFLUSH, &original);
@@ -80,9 +81,11 @@ void render_model(const Model &m) {
   size_t needed = render_width * render_height;
 
   if (frame.size() != needed)
-    frame.assign(needed, {0, 0, 0});
+    frame.assign(needed, g_background_color);
   else
-    memset(frame.data(), 0, needed * sizeof(Color));
+    std::fill(frame.begin(), frame.end(), g_background_color);
+
+  set_brightness(brightness);
 
   set_model({x_model, y_model, z_model}, {theta_model, rho_model, phi_model},
             {1, 1, 1});
@@ -95,22 +98,19 @@ void render_model(const Model &m) {
   for (int f = 0; f < m.nfaces(); ++f) {
     Vec4 c[3];
     Vec3 vn[3];
+    Vec2 uvs[3];
     for (int i = 0; i < 3; ++i) {
       c[i] = clip(m.vert(f, i));
       vn[i] = m.vert_normal(f, i);
+      uvs[i] = m.vert_texture(f, i);
     }
-
-    Color face_color;
 
     if (g_use_fixed_color) {
-      face_color = g_fixed_color;
+      rasterize(m, f, c, vn, uvs, frame, render_width, hw, render_height, hh,
+                &g_fixed_color);
     } else {
-      face_color = {(unsigned char)(rand() % 256),
-                    (unsigned char)(rand() % 256),
-                    (unsigned char)(rand() % 256)};
+      rasterize(m, f, c, vn, uvs, frame, render_width, hw, render_height, hh);
     }
-
-    rasterize(c, vn, frame, render_width, hw, render_height, hh, face_color);
   }
 
   output.clear();
@@ -165,6 +165,7 @@ int main(int argc, char *argv[]) {
                                          {"rotate", no_argument, 0, 'r'},
                                          {"speed", required_argument, 0, 's'},
                                          {"color", required_argument, 0, 'c'},
+                                         {"bcolor", required_argument, 0, 'b'},
                                          {"help", no_argument, 0, 'h'},
                                          {"version", no_argument, 0, 'v'},
                                          {0, 0, 0, 0}};
@@ -172,7 +173,7 @@ int main(int argc, char *argv[]) {
   int opt;
   int option_index = 0;
 
-  while ((opt = getopt_long(argc, argv, "f:rs:c:hv", long_options,
+  while ((opt = getopt_long(argc, argv, "f:rs:c:b:hv", long_options,
                             &option_index)) != -1) {
 
     switch (opt) {
@@ -196,6 +197,7 @@ int main(int argc, char *argv[]) {
              "  -r, --rotate       Start with auto rotation\n"
              "  -s, --speed N      Rotation speed (rad/sec)\n"
              "  -c  --color R,G,B  Change display color\n"
+             "  -b  --bcolor R,G,C Change background color\n"
              "  -h, --help         Show this help\n"
              "  -v, --version      Show version\n\n"
              "Controls (runtime):\n"
@@ -208,6 +210,8 @@ int main(int argc, char *argv[]) {
              "  k  down\n"
              "  u  zoom in\n"
              "  i  zoom out\n"
+             "  y  increase brightness\n"
+             "  o  decrease brightness\n"
              "  J  rotate left\n"
              "  L  rotate right\n"
              "  J  rotate up\n"
@@ -238,6 +242,21 @@ int main(int argc, char *argv[]) {
       g_fixed_color = {(unsigned char)r, (unsigned char)g, (unsigned char)b};
 
       g_use_fixed_color = true;
+      break;
+
+    case 'b':
+
+      if (sscanf(optarg, "%d,%d,%d", &r, &g, &b) != 3) {
+        fprintf(stderr, "--bcolor format: R,G,B\n");
+        return 1;
+      }
+
+      r = std::clamp(r, 0, 255);
+      g = std::clamp(g, 0, 255);
+      b = std::clamp(b, 0, 255);
+
+      g_background_color = {(unsigned char)r, (unsigned char)g,
+                            (unsigned char)b};
       break;
 
     default:
@@ -320,6 +339,7 @@ int main(int argc, char *argv[]) {
         else if (c == 'r') {
           x_model = y_model = theta_model = rho_model = phi_model = 0;
           change_scale = 1;
+          brightness = 1.0f;
           z_model = -2;
         }
 
@@ -335,6 +355,10 @@ int main(int argc, char *argv[]) {
           z_model += 0.1 * change_scale;
         else if (c == 'i')
           z_model -= 0.1 * change_scale;
+        else if (c == 'y')
+          brightness += 0.1 * change_scale;
+        else if (c == 'o')
+          brightness -= 0.1 * change_scale;
         else if (c == 'J')
           rho_model += M_PI / 10 * change_scale;
         else if (c == 'K')
