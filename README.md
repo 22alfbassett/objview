@@ -27,7 +27,7 @@ make prod
 
 -v, --version      Show version
 
-Controls (runtime):
+##### Controls (runtime):
 
 q  quit
 
