@@ -27,24 +27,50 @@ static void normalize_verts(Model &model) {
   }
 }
 
-Face parse_face(std::stringstream &ss) {
-  Face f;
+std::vector<Face> parse_face(std::stringstream &ss) {
+  std::vector<int> v_idx, vt_idx, vn_idx;
   std::string token;
-  int i = 0;
-  while (i < 3 && ss >> token) {
-    std::string part;
+
+  while (ss >> token) {
     std::stringstream ts(token);
+    std::string part;
 
-    std::getline(ts, part, '/');
-    f.v[i] = std::stoi(part) - 1;
+    int v = -1, vt = -1, vn = -1;
+
+    if (std::getline(ts, part, '/'))
+      v = std::stoi(part) - 1;
 
     if (std::getline(ts, part, '/') && !part.empty())
-      f.vt[i] = std::stoi(part) - 1;
+      vt = std::stoi(part) - 1;
+
     if (std::getline(ts, part, '/') && !part.empty())
-      f.vn[i] = std::stoi(part) - 1;
-    i++;
+      vn = std::stoi(part) - 1;
+
+    v_idx.push_back(v);
+    vt_idx.push_back(vt);
+    vn_idx.push_back(vn);
   }
-  return f;
+
+  std::vector<Face> triangles;
+
+  for (size_t i = 1; i + 1 < v_idx.size(); i++) {
+    Face f;
+    f.v[0] = v_idx[0];
+    f.v[1] = v_idx[i];
+    f.v[2] = v_idx[i + 1];
+
+    f.vt[0] = vt_idx[0];
+    f.vt[1] = vt_idx[i];
+    f.vt[2] = vt_idx[i + 1];
+
+    f.vn[0] = vn_idx[0];
+    f.vn[1] = vn_idx[i];
+    f.vn[2] = vn_idx[i + 1];
+
+    triangles.push_back(f);
+  }
+
+  return triangles;
 }
 
 Model::Model(const std::string &filename) {
@@ -87,9 +113,11 @@ Model::Model(const std::string &filename) {
         current_material = -1;
 
     } else if (tok == "f") {
-      Face f = parse_face(ss);
-      f.material_id = current_material;
-      faces.push_back(f);
+      std::vector<Face> new_faces = parse_face(ss);
+      for (Face &f : new_faces) {
+        f.material_id = current_material;
+        faces.push_back(f);
+      }
     }
   }
   if (!verts.empty()) {
