@@ -4,7 +4,6 @@
 #include <vector>
 
 void set_model(Vec3 pos, Vec3 rot, Vec3 scale);
-void look_at(Vec3 eye, Vec3 target, Vec3 up);
 void set_perspective(float near, float far, float aspect_ratio, float fov);
 
 void rasterize(const Model &model, int face_idx, Vec4 v[3], Vec3 vn[3],
