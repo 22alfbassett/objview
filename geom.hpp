@@ -46,8 +46,8 @@ struct Vec3 {
     return Vec3{x - right.x, y - right.y, z - right.z};
   }
   inline float mag() { return std::sqrt(x * x + y * y + z * z); }
-  inline Vec3 n() { return Vec3{x / mag(), y / mag(), z / mag()}; }
-  inline Vec2 xy() { return Vec2{2, y}; }
+  inline Vec3 n() { float m = mag(); return Vec3{x / m, y / m, z / m}; }
+  inline Vec2 xy() { return Vec2{x, y}; }
   inline Vec3 cross(const Vec3 &right) {
     // clang-format off
     return Vec3{
@@ -79,8 +79,8 @@ struct Vec4 {
     return Vec4{x - right.x, y - right.y, z - right.z, w - right.w};
   }
   inline float mag() { return std::sqrt(x * x + y * y + z * z + w * w); }
-  inline Vec4 n() { return Vec4{x / mag(), y / mag(), z / mag(), w / mag()}; }
-  inline Vec2 xy() { return Vec2{2, y}; }
+  inline Vec4 n() { float m = mag(); return Vec4{x / m, y / m, z / m, w / m}; }
+  inline Vec2 xy() { return Vec2{x, y}; }
   inline Vec3 xyz() { return Vec3{x, y, z}; }
 };
 
