@@ -75,7 +75,7 @@ public:
   const Material &mat(const int face_idx) const {
     static Material default_mat;
     int id = faces[face_idx].material_id;
-    if (id < 0 || id >= materials.size())
+    if (id < 0 || id >= (int)materials.size())
       return default_mat;
     return materials[id];
   }
