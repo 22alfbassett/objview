@@ -5,8 +5,8 @@
 #include <cstddef>
 #include <cstdio>
 #include <cstdlib>
-#include <cstring>
 #include <ctime>
+#include <cstring>
 #include <getopt.h>
 #include <signal.h>
 #include <sys/ioctl.h>
@@ -70,9 +70,6 @@ static float x_model = 0, y_model = 0, z_model = -2;
 static float theta_model = 0, rho_model = 0, phi_model = 0;
 
 void render_model(const Model &m) {
-  static unsigned int seed = time(NULL);
-  srand(seed);
-
   if (!render_width || !render_height)
     return;
 
@@ -158,7 +155,6 @@ int main(int argc, char *argv[]) {
   int target_fps = 60;
   bool auto_rotate = false;
   float rotation_speed = M_PI; // 1 rotation every 2 seconds
-  float render_scale = 1.0f;
   float change_scale = 1.0f;
 
   static struct option long_options[] = {{"fps", required_argument, 0, 'f'},
@@ -212,7 +208,7 @@ int main(int argc, char *argv[]) {
              "  i  zoom out\n"
              "  y  increase brightness\n"
              "  o  decrease brightness\n"
-             "  J  rotate left\n"
+             "  H  rotate left\n"
              "  L  rotate right\n"
              "  J  rotate up\n"
              "  K  rotate down\n"
@@ -272,7 +268,6 @@ int main(int argc, char *argv[]) {
 
   const char *model_path = argv[optind];
 
-  srand(time(NULL));
   Model m(model_path);
 
   struct sigaction sa{};
@@ -284,9 +279,8 @@ int main(int argc, char *argv[]) {
 
   update_size();
 
-  // apply scale after size update
-  render_width = std::max(1u, (unsigned)(term_width * render_scale));
-  render_height = std::max(1u, (unsigned)(term_height * 2 * render_scale));
+  render_width = term_width;
+  render_height = term_height * 2;
 
   render_model(m);
 
@@ -299,8 +293,8 @@ int main(int argc, char *argv[]) {
 
     if (resized) {
       update_size();
-      render_width = std::max(1u, (unsigned)(term_width * render_scale));
-      render_height = std::max(1u, (unsigned)(term_height * 2 * render_scale));
+      render_width = term_width;
+      render_height = term_height * 2;
       render_model(m);
     }
 
