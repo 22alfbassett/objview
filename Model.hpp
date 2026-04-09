@@ -44,6 +44,8 @@ private:
 
 public:
   Model(const std::string &filename);
+  void load_obj(const std::string &filename);
+  void load_stl(const std::string &filename);
   void load_mtl(const std::string &filename);
   void load_texture(Material *mat);
   int nverts() const { return verts.size(); };

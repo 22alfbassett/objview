@@ -1,7 +1,10 @@
 #include "Model.hpp"
 #include <cmath>
+#include <cctype>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -73,9 +76,30 @@ std::vector<Face> parse_face(std::stringstream &ss) {
   return triangles;
 }
 
+static std::string file_extension(const std::string &path) {
+  size_t dot = path.find_last_of('.');
+  if (dot == std::string::npos)
+    return "";
+  std::string ext = path.substr(dot);
+  for (char &c : ext)
+    c = std::tolower(c);
+  return ext;
+}
+
 Model::Model(const std::string &filename) {
   directory = filename.substr(0, filename.find_last_of("/\\") + 1);
 
+  std::string ext = file_extension(filename);
+  if (ext == ".stl")
+    load_stl(filename);
+  else
+    load_obj(filename);
+
+  if (!verts.empty())
+    normalize_verts(*this);
+}
+
+void Model::load_obj(const std::string &filename) {
   std::ifstream file(filename);
   if (!file) {
     fprintf(stderr, "objview: %s: No such file or directory\n",
@@ -120,8 +144,108 @@ Model::Model(const std::string &filename) {
       }
     }
   }
-  if (!verts.empty()) {
-    normalize_verts(*this);
+}
+
+void Model::load_stl(const std::string &filename) {
+  // Detect ASCII vs binary: ASCII STL starts with "solid" followed by
+  // a "facet" keyword on an early line
+  bool is_ascii = false;
+  {
+    std::ifstream test(filename);
+    std::string line;
+    if (std::getline(test, line)) {
+      size_t first = line.find_first_not_of(" \t");
+      if (first != std::string::npos &&
+          line.substr(first, 5) == "solid") {
+        while (std::getline(test, line)) {
+          first = line.find_first_not_of(" \t");
+          if (first == std::string::npos)
+            continue;
+          std::string trimmed = line.substr(first);
+          if (trimmed.rfind("facet", 0) == 0 ||
+              trimmed.rfind("endsolid", 0) == 0)
+            is_ascii = true;
+          break;
+        }
+      }
+    }
+  }
+
+  if (is_ascii) {
+    std::ifstream file(filename);
+    if (!file) {
+      fprintf(stderr, "objview: %s: No such file or directory\n",
+              filename.c_str());
+      exit(1);
+    }
+    std::string line;
+    std::getline(file, line); // skip "solid ..." line
+
+    Vec3 normal{};
+    int vert_count = 0;
+    while (std::getline(file, line)) {
+      std::stringstream ss(line);
+      std::string tok;
+      ss >> tok;
+      if (tok == "facet") {
+        ss >> tok; // "normal"
+        ss >> normal.x >> normal.y >> normal.z;
+      } else if (tok == "vertex") {
+        float x, y, z;
+        ss >> x >> y >> z;
+        verts.push_back({x, y, z});
+        vert_count++;
+        if (vert_count == 3) {
+          int base = verts.size() - 3;
+          int ni = vert_normals.size();
+          vert_normals.push_back(normal);
+          faces.push_back(
+              Face{{base, base + 1, base + 2}, {-1, -1, -1}, {ni, ni, ni}});
+          vert_count = 0;
+        }
+      }
+    }
+  } else {
+    std::ifstream file(filename, std::ios::binary);
+    if (!file) {
+      fprintf(stderr, "objview: %s: No such file or directory\n",
+              filename.c_str());
+      exit(1);
+    }
+
+    // Skip 80-byte header
+    file.seekg(80);
+
+    uint32_t num_triangles;
+    file.read(reinterpret_cast<char *>(&num_triangles), 4);
+
+    verts.reserve(num_triangles * 3);
+    vert_normals.reserve(num_triangles);
+    faces.reserve(num_triangles);
+
+    for (uint32_t i = 0; i < num_triangles; i++) {
+      float data[12]; // normal(3) + v0(3) + v1(3) + v2(3)
+      file.read(reinterpret_cast<char *>(data), 48);
+      uint16_t attr;
+      file.read(reinterpret_cast<char *>(&attr), 2);
+
+      if (!file) {
+        fprintf(stderr, "objview: %s: unexpected end of STL data\n",
+                filename.c_str());
+        break;
+      }
+
+      int ni = vert_normals.size();
+      vert_normals.push_back({data[0], data[1], data[2]});
+
+      int base = verts.size();
+      verts.push_back({data[3], data[4], data[5]});
+      verts.push_back({data[6], data[7], data[8]});
+      verts.push_back({data[9], data[10], data[11]});
+
+      faces.push_back(
+          Face{{base, base + 1, base + 2}, {-1, -1, -1}, {ni, ni, ni}});
+    }
   }
 }
 

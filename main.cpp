@@ -187,7 +187,7 @@ int main(int argc, char *argv[]) {
       break;
 
     case 'h':
-      printf("Usage: %s [options] <file.obj>\n\n"
+      printf("Usage: %s [options] <file.obj|file.stl>\n\n"
              "Options:\n"
              "  -f, --fps N        Target FPS (default 60)\n"
              "  -r, --rotate       Start with auto rotation\n"
